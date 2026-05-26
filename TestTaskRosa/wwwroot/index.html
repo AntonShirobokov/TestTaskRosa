@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Сервис бухгалтерских справок</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+    <style>
+        :root {
+            --primary: #0066cc;
+        }
+        .container {
+            max-width: 900px;
+            margin-top: 2rem;
+        }
+        .hidden {
+            display: none;
+        }
+        .status-badge {
+            padding: 0.2rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: bold;
+        }
+        .status-Created { background: #e0e0e0; color: #333; }
+        .status-InProgress { background: #fff3cd; color: #856404; }
+        .status-Done { background: #d4edda; color: #155724; }
+        .status-Rejected { background: #f8d7da; color: #721c24; }
+        
+        nav ul li a {
+            cursor: pointer;
+        }
+        .card {
+            padding: 1.5rem;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            background: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .header-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <nav class="container-fluid">
+        <ul>
+            <li><strong>RosaCert</strong></li>
+        </ul>
+        <ul id="main-nav">
+            <li><a onclick="showView('role-selection')">Главная</a></li>
+            <li class="employee-only hidden"><a onclick="showView('employee-dashboard')">Мои запросы</a></li>
+            <li class="accountant-only hidden"><a onclick="showView('accountant-dashboard')">Очередь заявок</a></li>
+        </ul>
+    </nav>
+
+    <main class="container">
+        <!-- Role Selection -->
+        <section id="role-selection">
+            <h1 style="text-align: center;">Добро пожаловать</h1>
+            <p style="text-align: center;">Пожалуйста, выберите вашу роль для продолжения работы в системе.</p>
+            <div class="grid">
+                <article>
+                    <header><h3>Сотрудник</h3></header>
+                    <p>Запрашивайте справки 2-НДФЛ, о стаже и другие документы дистанционно.</p>
+                    <footer><button onclick="selectRole('employee')">Войти как сотрудник</button></footer>
+                </article>
+                <article>
+                    <header><h3>Бухгалтер</h3></header>
+                    <p>Просматривайте и обрабатывайте входящие запросы от сотрудников компании.</p>
+                    <footer><button class="secondary" onclick="selectRole('accountant')">Войти как бухгалтер</button></footer>
+                </article>
+            </div>
+        </section>
+
+        <!-- Employee Dashboard -->
+        <section id="employee-dashboard" class="hidden">
+            <div class="header-actions">
+                <h2>Мои запросы</h2>
+                <button onclick="openRequestModal()">Новый запрос</button>
+            </div>
+            
+            <div id="employee-requests-list">
+                <!-- Requests will be loaded here -->
+                <p aria-busy="true">Загрузка ваших запросов...</p>
+            </div>
+        </section>
+
+        <!-- Accountant Dashboard -->
+        <section id="accountant-dashboard" class="hidden">
+            <h2>Очередь заявок</h2>
+            <div id="accountant-requests-list">
+                <!-- Requests will be loaded here -->
+                <p aria-busy="true">Загрузка очереди заявок...</p>
+            </div>
+        </section>
+    </main>
+
+    <!-- Request Modal -->
+    <dialog id="request-modal">
+        <article>
+            <h3>Новый запрос на справку</h3>
+            <form id="request-form">
+                <label for="certificateType">Тип справки
+                    <select id="certificateType" required>
+                        <option value="" disabled selected>Выберите тип...</option>
+                        <option value="2-НДФЛ">2-НДФЛ</option>
+                        <option value="О месте работы и стаже">О месте работы и стаже</option>
+                        <option value="О среднем заработке">О среднем заработке</option>
+                        <option value="Произвольная справка">Произвольная справка</option>
+                    </select>
+                </label>
+
+                <label for="copies">Количество экземпляров
+                    <input type="number" id="copies" value="1" min="1" max="10" required>
+                </label>
+
+                <label for="reason">Причина запроса
+                    <textarea id="reason" placeholder="Например: Для получения кредита" required></textarea>
+                </label>
+
+                <footer>
+                    <button type="button" class="secondary" onclick="closeRequestModal()">Отмена</button>
+                    <button type="submit">Отправить</button>
+                </footer>
+            </form>
+        </article>
+    </dialog>
+
+    <script>
+        let currentRole = null;
+        let currentUser = "Иванов Иван Иванович";
+
+        const statusMap = {
+            0: 'Новый',
+            1: 'В работе',
+            2: 'Готово',
+            3: 'Отклонено'
+        };
+
+        const statusClassMap = {
+            0: 'Created',
+            1: 'InProgress',
+            2: 'Done',
+            3: 'Rejected'
+        };
+
+        function showView(viewId) {
+            document.querySelectorAll('main > section').forEach(s => s.classList.add('hidden'));
+            document.getElementById(viewId).classList.remove('hidden');
+            
+            if (viewId === 'employee-dashboard') loadEmployeeRequests();
+            if (viewId === 'accountant-dashboard') loadAccountantRequests();
+        }
+
+        function selectRole(role) {
+            currentRole = role;
+            document.querySelectorAll('.employee-only').forEach(el => el.classList.toggle('hidden', role !== 'employee'));
+            document.querySelectorAll('.accountant-only').forEach(el => el.classList.toggle('hidden', role !== 'accountant'));
+            
+            if (role === 'employee') {
+                showView('employee-dashboard');
+            } else {
+                showView('accountant-dashboard');
+            }
+        }
+
+        async function loadEmployeeRequests() {
+            const container = document.getElementById('employee-requests-list');
+            try {
+                const res = await fetch(`/api/requests?employeeName=${encodeURIComponent(currentUser)}`);
+                const requests = await res.json();
+                
+                if (requests.length === 0) {
+                    container.innerHTML = '<p>У вас пока нет отправленных запросов.</p>';
+                    return;
+                }
+
+                container.innerHTML = requests.map(req => `
+                    <div class="card">
+                        <div style="display: flex; justify-content: space-between;">
+                            <strong>${req.certificateType}</strong>
+                            <span class="status-badge status-${statusClassMap[req.status]}">${statusMap[req.status]}</span>
+                        </div>
+                        <small>${new Date(req.createdAt).toLocaleString()}</small>
+                        <p style="margin-top: 0.5rem; margin-bottom: 0;">Причина: ${req.reason}</p>
+                    </div>
+                `).join('');
+            } catch (err) {
+                container.innerHTML = '<p style="color: red;">Ошибка при загрузке данных.</p>';
+            }
+        }
+
+        async function loadAccountantRequests() {
+            const container = document.getElementById('accountant-requests-list');
+            try {
+                const res = await fetch('/api/requests');
+                const requests = await res.json();
+                
+                if (requests.length === 0) {
+                    container.innerHTML = '<p>Очередь заявок пуста.</p>';
+                    return;
+                }
+
+                container.innerHTML = requests.map(req => `
+                    <div class="card">
+                        <div style="display: flex; justify-content: space-between;">
+                            <strong>${req.employeeName}</strong>
+                            <span class="status-badge status-${statusClassMap[req.status]}">${statusMap[req.status]}</span>
+                        </div>
+                        <p style="margin: 0.5rem 0;">
+                            <b>Тип:</b> ${req.certificateType} (${req.copies} экз.)<br>
+                            <b>Причина:</b> ${req.reason}<br>
+                            <small>${new Date(req.createdAt).toLocaleString()}</small>
+                        </p>
+                        <div class="grid" style="margin-top: 1rem;">
+                            <button class="outline" onclick="updateStatus('${req.id}', 1)" ${req.status === 1 ? 'disabled' : ''}>В работу</button>
+                            <button class="outline" onclick="updateStatus('${req.id}', 2)" ${req.status === 2 ? 'disabled' : ''} style="border-color: green; color: green;">Готово</button>
+                            <button class="outline" onclick="updateStatus('${req.id}', 3)" ${req.status === 3 ? 'disabled' : ''} style="border-color: red; color: red;">Отклонить</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                container.innerHTML = '<p style="color: red;">Ошибка при загрузке данных.</p>';
+            }
+        }
+
+        async function updateStatus(id, status) {
+            try {
+                const res = await fetch(`/api/requests/${id}/status?status=${status}`, {
+                    method: 'PATCH'
+                });
+                if (res.ok) {
+                    loadAccountantRequests();
+                } else {
+                    alert('Ошибка при обновлении статуса');
+                }
+            } catch (err) {
+                alert('Ошибка сети');
+            }
+        }
+
+        function openRequestModal() {
+            document.getElementById('request-modal').showModal();
+        }
+
+        function closeRequestModal() {
+            document.getElementById('request-modal').close();
+        }
+
+        document.getElementById('request-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const data = {
+                employeeName: currentUser,
+                certificateType: document.getElementById('certificateType').value,
+                copies: parseInt(document.getElementById('copies').value),
+                reason: document.getElementById('reason').value
+            };
+
+            try {
+                const res = await fetch('/api/requests', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (res.ok) {
+                    closeRequestModal();
+                    loadEmployeeRequests();
+                    e.target.reset();
+                } else {
+                    const msg = await res.text();
+                    alert(msg || 'Ошибка при отправке запроса');
+                }
+            } catch (err) {
+                alert('Ошибка сети');
+            }
+        });
+    </script>
+</body>
+</html>
