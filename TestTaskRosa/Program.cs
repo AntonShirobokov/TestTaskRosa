@@ -4,7 +4,6 @@ using TestTaskRosa.Services;
 
 var builder = WebApplication.CreateBuilder(args); 
 
-// Add services to the container.
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
@@ -17,7 +16,6 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-// Apply migrations on startup
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -27,7 +25,6 @@ using (var scope = app.Services.CreateScope())
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();

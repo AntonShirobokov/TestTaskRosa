@@ -39,3 +39,5 @@
 - User: postgres
 - Password: postgres
 
+В файле ANSWERS.md находятся ответы на вопросы для рефлексии
+

@@ -15,7 +15,6 @@ namespace TestTaskRosa.Services
 
         public async Task<Request> Create(Request request)
         {
-            // Simple duplicate check: same employee, same type, same reason within last 5 minutes
             var cutoff = DateTime.UtcNow.AddMinutes(-5);
             var isDuplicate = await _db.Requests.AnyAsync(r => 
                 r.EmployeeName == request.EmployeeName && 
