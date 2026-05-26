@@ -1,0 +1,2 @@
+C:\Users\Anton\source\repos\TestTaskRosa\TestTaskRosa\wwwroot\index.html
+wwwroot\index.html
